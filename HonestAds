@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+import json
+import requests
+import argparse
+
+class HonestAds:
+    def __init__(self):
+        self.base_url = "https://adstransparency.google.com/"
+        self.session = requests.Session()
+        self.session.headers = {"Content-Type": "application/x-www-form-urlencoded"}
+        self.session.params = {"authuser":""}
+
+    def get_advertiser_by_id(self, advertiser_id):
+        path = "anji/_/rpc/LookupService/GetAdvertiserById"
+        data={"f.req": '{"1":"%s"}' % advertiser_id}
+        response = self.session.post(self.base_url + path, data=data)
+        result = response.json()
+        return dict(
+            advertiser_id=result["1"]["1"],
+            advertiser_disclosed_name=result["1"]["2"],
+            region_code=result["1"]["3"],
+            advertiser_legal_name=result["1"]["9"]["1"],
+        )
+    
+    def get_creative_by_id(self, advertiser_id, creative_id):
+        path = "anji/_/rpc/LookupService/GetCreativeById"
+        data={"f.req": '{"1":"%s","2":"%s","5":{"1":0,"2":0,"3":0}}' % (advertiser_id, creative_id)}
+        response = self.session.post(self.base_url + path, data=data)
+        result = response.json()
+        return dict(
+            advertiser_id=result["1"]["1"],
+            creative_id=result["1"]["2"],
+            first_shown=result["1"]["3"]["1"],
+            last_shown_timestamp=result["1"]["4"]["1"],
+            # If Has "3" is of type "Google Search" || If Has "1" is of type  "Google Play" / "Google Maps" / "Google Shopping" / "YouTube"
+            ad_data=[ad["3"]["2"].split('\'')[1] if "3" in ad else ad["1"]["4"] for ad in result["1"]["5"]],
+            url="https://adstransparency.google.com/advertiser/%s/creative/%s" % (result["1"]["1"], result["1"]["2"])
+        )
+
+    def search_creatives(self, word, next_page=None):
+        path = "anji/_/rpc/SearchService/SearchCreatives"
+        if next_page:
+            data={"f.req": '{"2":100,"3":{"12":{"1":"%s","2":true}},"4":"%s","7":{"1":1,"2":0,"3":0}}' % (word, next_page)}
+        else:
+            data={"f.req": '{"2":100,"3":{"12":{"1":"%s","2":true}},"7":{"1":1,"2":0,"3":0}}' % word}
+        response = self.session.post(self.base_url + path, data=data)
+        result = response.json()
+        return [dict(
+            advertiser_id=res["1"],
+            creative_id=res["2"],
+            advertiser_name=res["12"],
+            domain=res["14"],
+            first_shown=res["6"]["1"],
+            last_shown_timestamp=res["7"]["1"],
+            ad_data=res["3"]["3"]["2"].split('"')[1] if "3" in res["3"] else res["3"]["1"]["4"],
+            url="https://adstransparency.google.com/advertiser/%s/creative/%s" % (res["1"], res["2"])
+        ) for res in result["1"]] + self.search_creatives(word, result["2"]) if "2" in result else []
+
+
+def main():
+    # Initialize the HonestAds
+    ha = HonestAds()
+
+    # Set up argument parsing
+    parser = argparse.ArgumentParser(description="HonestAds")
+    parser.add_argument("search_domain", help="The domain to filter by")
+    parser.add_argument("search_value", help="The keyword to search for")
+
+    # Parse the command line arguments
+    args = parser.parse_args()
+
+    # Search for creatives using the provided keyword
+    creatives = ha.search_creatives(args.search_value)
+
+    # Filter creatives by the provided domain
+    filtered_creatives = [creative for creative in creatives if creative["domain"] == args.search_domain]
+
+    # Print each filtered creative as a JSON object, one per line
+    for creative in filtered_creatives:
+        print(json.dumps(creative))
+
+if __name__ == "__main__":
+    main()
