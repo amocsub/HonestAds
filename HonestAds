@@ -2,6 +2,24 @@
 import json
 import requests
 import argparse
+from pyfzf.pyfzf import FzfPrompt
+
+def print_banner():
+    print("""
+    __  __                      __  ___       __    
+   / / / /___  ____  ___  _____/ /_/   | ____/ /____
+  / /_/ / __ \/ __ \/ _ \/ ___/ __/ /| |/ __  / ___/
+ / __  / /_/ / / / /  __(__  ) /_/ ___ / /_/ (__  ) 
+/_/ /_/\____/_/ /_/\___/____/\__/_/  |_\__,_/____/  
+    """)
+
+def get_nested_value(d, keys):
+    for key in keys:
+        if isinstance(d, dict) and key in d:
+            d = d[key]
+        else:
+            return ""
+    return d
 
 class HonestAds:
     def __init__(self):
@@ -16,10 +34,10 @@ class HonestAds:
         response = self.session.post(self.base_url + path, data=data)
         result = response.json()
         return dict(
-            advertiser_id=result["1"]["1"],
-            advertiser_disclosed_name=result["1"]["2"],
-            region_code=result["1"]["3"],
-            advertiser_legal_name=result["1"]["9"]["1"],
+            advertiser_id=get_nested_value(result, ["1", "1"]),
+            advertiser_disclosed_name=get_nested_value(result, ["1", "2"]),
+            region_code=get_nested_value(result, ["1", "3"]),
+            advertiser_legal_name=get_nested_value(result, ["1", "9", "1"]),
         )
     
     def get_creative_by_id(self, advertiser_id, creative_id):
@@ -28,16 +46,15 @@ class HonestAds:
         response = self.session.post(self.base_url + path, data=data)
         result = response.json()
         return dict(
-            advertiser_id=result["1"]["1"],
-            creative_id=result["1"]["2"],
-            first_shown=result["1"]["3"]["1"],
-            last_shown_timestamp=result["1"]["4"]["1"],
-            # If Has "3" is of type "Google Search" || If Has "1" is of type  "Google Play" / "Google Maps" / "Google Shopping" / "YouTube"
-            ad_data=[ad["3"]["2"].split('\'')[1] if "3" in ad else ad["1"]["4"] for ad in result["1"]["5"]],
-            url="https://adstransparency.google.com/advertiser/%s/creative/%s" % (result["1"]["1"], result["1"]["2"])
+            advertiser_id=get_nested_value(result, ["1", "1"]),
+            creative_id=get_nested_value(result, ["1", "2"]),
+            first_shown=get_nested_value(result, ["1", "3", "1"]),
+            last_shown_timestamp=get_nested_value(result, ["1", "4", "1"]),
+            ad_data=[get_nested_value(ad, ["3", "2"]).split('\'')[1] if "3" in ad else get_nested_value(ad, ["1", "4"]) for ad in get_nested_value(result, ["1", "5"])],
+            url="https://adstransparency.google.com/advertiser/%s/creative/%s" % (get_nested_value(result, ["1", "1"]), get_nested_value(result, ["1", "2"]))
         )
 
-    def search_creatives(self, word, next_page=None):
+    def search_creatives_by_text(self, word, next_page=None):
         path = "anji/_/rpc/SearchService/SearchCreatives"
         if next_page:
             data={"f.req": '{"2":100,"3":{"12":{"1":"%s","2":true}},"4":"%s","7":{"1":1,"2":0,"3":0}}' % (word, next_page)}
@@ -46,16 +63,22 @@ class HonestAds:
         response = self.session.post(self.base_url + path, data=data)
         result = response.json()
         return [dict(
-            advertiser_id=res["1"],
-            creative_id=res["2"],
-            advertiser_name=res["12"],
-            domain=res["14"],
-            first_shown=res["6"]["1"],
-            last_shown_timestamp=res["7"]["1"],
-            ad_data=res["3"]["3"]["2"].split('"')[1] if "3" in res["3"] else res["3"]["1"]["4"],
-            url="https://adstransparency.google.com/advertiser/%s/creative/%s" % (res["1"], res["2"])
-        ) for res in result["1"]] + self.search_creatives(word, result["2"]) if "2" in result else []
-
+            advertiser_id=get_nested_value(res, ["1"]),
+            creative_id=get_nested_value(res, ["2"]),
+            advertiser_name=get_nested_value(res, ["12"]),
+            domain=get_nested_value(res, ["14"]),
+            first_shown=get_nested_value(res, ["6", "1"]),
+            last_shown_timestamp=get_nested_value(res, ["7", "1"]),
+            ad_data=get_nested_value(res, ["3", "3", "2"]).split('"')[1] if "3" in get_nested_value(res, ["3"]) else get_nested_value(res, ["3", "1", "4"]),
+            url="https://adstransparency.google.com/advertiser/%s/creative/%s" % (get_nested_value(res, ["1"]), get_nested_value(res, ["2"]))
+        ) for res in get_nested_value(result, ["1"])] + self.search_creatives_by_text(word, get_nested_value(result, ["2"])) if "2" in result else []
+    
+    def search_suggestions(self, text):
+        path = "anji/_/rpc/SearchService/SearchSuggestions"
+        data={"f.req": '{"1":"%s","2":10,"3":10}' % (text)}
+        response = self.session.post(self.base_url + path, data=data)
+        result = response.json()
+        return [{"display":get_nested_value(res, ["2", "1"]), "value":get_nested_value(res, ["2", "1"])} if "2" in res else {"display": get_nested_value(res, ["1", "1"]), "value": get_nested_value(res, ["1", "2"])} for res in get_nested_value(result, ["1"])]
 
 def main():
     # Initialize the HonestAds
@@ -63,21 +86,78 @@ def main():
 
     # Set up argument parsing
     parser = argparse.ArgumentParser(description="HonestAds")
-    parser.add_argument("search_domain", help="The domain to filter by")
-    parser.add_argument("search_value", help="The keyword to search for")
+    parser.add_argument("--no_banner", help="Do not print the banner", action="store_true")
+    parser.add_argument("search_value", help="The domain / keyword to search by", nargs='?')
 
     # Parse the command line arguments
     args = parser.parse_args()
 
-    # Search for creatives using the provided keyword
-    creatives = ha.search_creatives(args.search_value)
+    # fzf picker
+    fzf = FzfPrompt()
 
-    # Filter creatives by the provided domain
-    filtered_creatives = [creative for creative in creatives if creative["domain"] == args.search_domain]
+    # Display the banner if not suppressed
+    if not args.no_banner:
+        print_banner()
 
-    # Print each filtered creative as a JSON object, one per line
+    # Prompt the user to input the search suggestion they would like to search and then hit enter
+    if args.search_value:
+        search_value = args.search_value
+    else:
+        search_value = input("Enter the search value: ")
+
+    # Search for suggestions using the provided keyword
+    suggestions = ha.search_suggestions(search_value)
+
+    # Inform the user about the selection process
+    selected_suggestions = fzf.prompt([s["display"] for s in suggestions], "--multi --header 'Select the suggestions you want to search for (hit TAB for multiple selection):'")
+
+    # Search for creatives for all of the selected suggestions
+    all_creatives = []
+    for suggestion in selected_suggestions:
+        creatives = ha.search_creatives_by_text(suggestion)
+        all_creatives.extend(creatives)
+
+    # Ask if the user wants to filter by the domain where the creative is displayed or by advertiser_name, also give the option to not filter
+    filter_option = fzf.prompt(["Filter by domain", "Filter by advertiser_name", "No filter"], "--header 'Select the filter option (hit TAB for multiple selection):'")[0]
+
+    # Depending on the selection, display the list of domains, advertiser_names, or creatives with fzf
+    if filter_option == "Filter by domain":
+        domains = list(set([creative["domain"] for creative in all_creatives]))
+        selected_domains = fzf.prompt(domains, "--multi --header 'Select the domains to filter by (hit TAB for multiple selection):'")
+        filtered_creatives = [creative for creative in all_creatives if creative["domain"] in selected_domains]
+    elif filter_option == "Filter by advertiser_name":
+        advertiser_names = list(set([creative["advertiser_name"] for creative in all_creatives]))
+        selected_advertiser_names = fzf.prompt(advertiser_names, "--multi --header 'Select the advertiser names to filter by (hit TAB for multiple selection):'")
+        filtered_creatives = [creative for creative in all_creatives if creative["advertiser_name"] in selected_advertiser_names]
+    else:
+        filtered_creatives = all_creatives
+
+    # Ask if the user wants to exclude any domains or advertiser names
+    exclude_option = fzf.prompt(["Exclude by domain", "Exclude by advertiser_name", "No exclusion"], "--header 'Select the exclusion option (hit TAB for multiple selection):'")[0]
+
+    if exclude_option == "Exclude by domain":
+        domains = list(set([creative["domain"] for creative in filtered_creatives]))
+        excluded_domains = fzf.prompt(domains, "--multi --header 'Select the domains to exclude (hit TAB for multiple selection):'")
+        filtered_creatives = [creative for creative in filtered_creatives if creative["domain"] not in excluded_domains]
+    elif exclude_option == "Exclude by advertiser_name":
+        advertiser_names = list(set([creative["advertiser_name"] for creative in filtered_creatives]))
+        excluded_advertiser_names = fzf.prompt(advertiser_names, "--multi --header 'Select the advertiser names to exclude (hit TAB for multiple selection):'")
+        filtered_creatives = [creative for creative in filtered_creatives if creative["advertiser_name"] not in excluded_advertiser_names]
+
+    # Ask the user if they want all the information or just any of the keywords, they need to select this with fzf
+    info_option = fzf.prompt(["All information", "Keywords only"], "--header 'Select the information option (hit TAB for multiple selection):'")[0]
+
+    if info_option == "Keywords only":
+        # Ask the user to select which keywords they want to display
+        keys = ["advertiser_id", "creative_id", "advertiser_name", "domain", "first_shown", "last_shown_timestamp", "ad_data", "url"]
+        selected_keys = fzf.prompt(keys, "--multi --header 'Select the keywords to display (hit TAB for multiple selection):'")
+
+    # Display the information to the user
     for creative in filtered_creatives:
-        print(json.dumps(creative))
+        if info_option == "All information":
+            print(json.dumps(creative, indent=2))
+        else:
+            print(json.dumps({k: creative[k] for k in selected_keys}, indent=2))
 
 if __name__ == "__main__":
     main()
