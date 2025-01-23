@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import json
 import requests
 import argparse
 from pyfzf.pyfzf import FzfPrompt
@@ -11,7 +10,8 @@ def print_banner():
   / /_/ / __ \/ __ \/ _ \/ ___/ __/ /| |/ __  / ___/
  / __  / /_/ / / / /  __(__  ) /_/ ___ / /_/ (__  ) 
 /_/ /_/\____/_/ /_/\___/____/\__/_/  |_\__,_/____/  
-    """)
+    By @amocsub & @chatGPT 
+          """)
 
 def get_nested_value(d, keys):
     for key in keys:
@@ -87,6 +87,7 @@ def main():
     # Set up argument parsing
     parser = argparse.ArgumentParser(description="HonestAds")
     parser.add_argument("--no_banner", help="Do not print the banner", action="store_true")
+    parser.add_argument("--verbose", help="Verbose mode (print tracebacks)", action="store_true")
     parser.add_argument("search_value", help="The domain / keyword to search by", nargs='?')
 
     # Parse the command line arguments
@@ -108,17 +109,16 @@ def main():
     # Search for suggestions using the provided keyword
     suggestions = ha.search_suggestions(search_value)
 
-    # Inform the user about the selection process
-    selected_suggestions = fzf.prompt([s["display"] for s in suggestions], "--multi --header 'Select the suggestions you want to search for (hit TAB for multiple selection):'")
-
-    # Search for creatives for all of the selected suggestions
+    # Inform the user about the selection proces
+    selected_suggestions_display = fzf.prompt([s["display"] for s in suggestions], "--multi --header 'Select from the suggestions the things you want to search for Ads (hit TAB for multiple selection):'")
+    selected_suggestions = [s for s in suggestions if s["display"] in selected_suggestions_display]
     all_creatives = []
     for suggestion in selected_suggestions:
-        creatives = ha.search_creatives_by_text(suggestion)
+        creatives = ha.search_creatives_by_text(suggestion["value"])
         all_creatives.extend(creatives)
 
     # Ask if the user wants to filter by the domain where the creative is displayed or by advertiser_name, also give the option to not filter
-    filter_option = fzf.prompt(["Filter by domain", "Filter by advertiser_name", "No filter"], "--header 'Select the filter option (hit TAB for multiple selection):'")[0]
+    filter_option = fzf.prompt(["Filter by domain", "Filter by advertiser_name", "No filter"], "--header 'Select the filter option you want to apply to the results:'")[0]
 
     # Depending on the selection, display the list of domains, advertiser_names, or creatives with fzf
     if filter_option == "Filter by domain":
@@ -133,7 +133,7 @@ def main():
         filtered_creatives = all_creatives
 
     # Ask if the user wants to exclude any domains or advertiser names
-    exclude_option = fzf.prompt(["Exclude by domain", "Exclude by advertiser_name", "No exclusion"], "--header 'Select the exclusion option (hit TAB for multiple selection):'")[0]
+    exclude_option = fzf.prompt(["Exclude by domain", "Exclude by advertiser_name", "No exclusion"], "--header 'Select the option for excluding values from the results:'")[0]
 
     if exclude_option == "Exclude by domain":
         domains = list(set([creative["domain"] for creative in filtered_creatives]))
@@ -145,19 +145,37 @@ def main():
         filtered_creatives = [creative for creative in filtered_creatives if creative["advertiser_name"] not in excluded_advertiser_names]
 
     # Ask the user if they want all the information or just any of the keywords, they need to select this with fzf
-    info_option = fzf.prompt(["All information", "Keywords only"], "--header 'Select the information option (hit TAB for multiple selection):'")[0]
+    info_option = fzf.prompt(["All information", "Keywords only"], "--header 'Select the information option:'")[0]
 
     if info_option == "Keywords only":
         # Ask the user to select which keywords they want to display
         keys = ["advertiser_id", "creative_id", "advertiser_name", "domain", "first_shown", "last_shown_timestamp", "ad_data", "url"]
         selected_keys = fzf.prompt(keys, "--multi --header 'Select the keywords to display (hit TAB for multiple selection):'")
 
-    # Display the information to the user
-    for creative in filtered_creatives:
-        if info_option == "All information":
-            print(json.dumps(creative, indent=2))
-        else:
-            print(json.dumps({k: creative[k] for k in selected_keys}, indent=2))
+    # Display the information to the user 
+    if info_option == "All information":
+        lines = [f"Advertiser: {c['advertiser_name']}, Domain: {c['domain']}, URL: {c['url']}" for c in filtered_creatives]
+        selected_lines = fzf.prompt(lines, "--multi --header 'Filter or select specific creatives to view in detail:'")
+        selected_creatives = []
+        for line in selected_lines:
+            for c in filtered_creatives:
+                if line == f"Advertiser: {c['advertiser_name']}, Domain: {c['domain']}, URL: {c['url']}":
+                    selected_creatives.append(c)
+                    break
+        resultants = fzf.prompt(selected_creatives, "--multi --header 'Select the results you want to display as json objects (hit TAB for multiple selection):'")
+    else:
+        resultants = fzf.prompt([{k: creative[k] for k in selected_keys} for creative in filtered_creatives], "--multi --header 'Select the results you want to display as json objects (hit TAB for multiple selection):'")
+    for result in resultants:
+        print(result)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("Exiting due to user interruption.")
+    except Exception as e:
+        import sys
+        if "--verbose" in sys.argv:
+            raise
+        else:
+            print(f"An error occurred: {e}")
