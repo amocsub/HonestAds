@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HonestAds Explorer</title>
+    <meta
+      name="description"
+      content="Fast, interactive explorer for Google Ads Transparency Center creatives."
+    >
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+    >
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="hero">
+      <div>
+        <p class="hero__eyebrow">Unofficial transparency explorer</p>
+        <h1>HonestAds Explorer</h1>
+      </div>
+      <div class="hero__actions">
+        <button id="toggle-description" class="button button--ghost button--small">About</button>
+        <div class="hero__status" id="status-pill" hidden></div>
+      </div>
+    </header>
+
+    <section class="panel panel--description" id="description-panel" hidden>
+      <p>
+        HonestAds proxies Google’s Ads Transparency Center through a Cloudflare Worker, so you can
+        discover advertisers, domains, and creatives without logging in or fighting the official UI.
+        Type anything—brands, NGOs, slogans, domains—and as soon as you track a suggestion the worker
+        streams every matching creative into a responsive gallery. Filters, exports, and dialogs all
+        update in real time so you can investigate ad campaigns as if you were browsing a photo app.
+      </p>
+    </section>
+
+    <main>
+      <section class="panel panel--search" data-collapsed="false">
+        <div class="panel__header">
+          <h2>Search ads</h2>
+          <button id="collapse-search" class="button button--ghost button--small">Hide search</button>
+        </div>
+        <div class="panel__content">
+          <label class="field">
+            <span>Query</span>
+            <input
+              type="text"
+              id="search-input"
+              placeholder="Type a domain, brand, candidate..."
+              autocomplete="off"
+            >
+          </label>
+          <p class="helper-text">
+            Suggestions refresh as you type. Press <kbd>Enter</kbd> to track the top suggestion.
+          </p>
+          <div id="suggestions-container" class="suggestions suggestions--compact">
+            <p class="empty">Start typing to see suggestions.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel panel--selections">
+        <div class="panel__header">
+          <div>
+            <h2>Tracked suggestions</h2>
+            <p class="helper-text">
+              Click a suggestion to follow it. Creatives download automatically.
+            </p>
+          </div>
+          <button id="clear-suggestions" class="button button--ghost button--small">Clear all</button>
+        </div>
+        <div id="selected-suggestions" class="chip-list" aria-live="polite"></div>
+        <p id="creative-progress" class="helper-text"></p>
+      </section>
+
+      <section class="panel panel--filters">
+        <div class="panel__header">
+          <div>
+            <h2>Filters & ordering</h2>
+            <p class="helper-text">
+              Build any combination of include/exclude rules, structural thresholds, and sort orders.
+            </p>
+          </div>
+          <button id="add-filter" class="button button--ghost button--small">+ Add filter</button>
+        </div>
+        <div class="filter-toolbar">
+          <div class="order-by">
+            <label>
+              <span>Order by</span>
+              <select id="order-by">
+                <option value="last_shown_timestamp">Last shown</option>
+                <option value="advertiser_name">Advertiser</option>
+                <option value="domain">Domain</option>
+                <option value="ad_count"># of ads (per advertiser)</option>
+              </select>
+            </label>
+            <button id="order-by-direction" class="button button--ghost button--small" aria-label="Toggle sort direction">
+              Desc
+            </button>
+          </div>
+        </div>
+        <div id="active-filters" class="chip-list chip-list--wrap">
+          <p class="helper-text">No custom filters yet.</p>
+        </div>
+      </section>
+
+      <section class="panel panel--gallery">
+        <div class="panel__header">
+          <div>
+            <h2>Creative gallery</h2>
+            <p id="result-summary" class="helper-text">No creatives yet.</p>
+          </div>
+          <button id="open-export-dialog" class="button button--ghost">Export creatives</button>
+        </div>
+        <div id="gallery-grid" class="gallery-grid">
+          <p class="empty">Track at least one suggestion to populate the gallery.</p>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="creative-dialog">
+      <article class="creative-modal">
+        <header>
+          <h3>Creative details</h3>
+          <button type="button" id="close-creative-dialog" class="button button--ghost button--small">
+            Close
+          </button>
+        </header>
+        <div id="creative-dialog-body"></div>
+      </article>
+    </dialog>
+
+    <dialog id="filter-dialog">
+      <form method="dialog" id="filter-form">
+        <header>
+          <h3>Add filter</h3>
+        </header>
+        <label class="field">
+          <span>Filter type</span>
+          <select id="filter-type">
+            <option value="includeAdvertiser">Include advertiser</option>
+            <option value="excludeAdvertiser">Exclude advertiser</option>
+            <option value="includeDomain">Include domain</option>
+            <option value="excludeDomain">Exclude domain</option>
+            <option value="minAds">Minimum ads per advertiser</option>
+            <option value="minDomainAdvertisers">Minimum advertisers per domain</option>
+          </select>
+        </label>
+        <label class="field" id="filter-value-wrapper">
+          <span id="filter-value-label">Value</span>
+          <input type="text" id="filter-value" autocomplete="off">
+        </label>
+        <menu>
+          <button value="cancel" class="button button--ghost">Cancel</button>
+          <button value="submit" class="button button--primary">Add</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <dialog id="export-dialog">
+      <form method="dialog" id="export-form">
+        <header>
+          <h3>Export creatives</h3>
+        </header>
+        <fieldset class="export-format">
+          <legend>Format</legend>
+          <label>
+            <input type="radio" name="export-format" value="json" checked>
+            JSON
+          </label>
+          <label>
+            <input type="radio" name="export-format" value="csv">
+            CSV
+          </label>
+        </fieldset>
+        <div class="export-columns">
+          <p>Select the columns to include:</p>
+          <div id="export-columns"></div>
+        </div>
+        <menu>
+          <button value="cancel" class="button button--ghost">Cancel</button>
+          <button value="submit" class="button button--primary">Create</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <datalist id="filter-advertisers-options"></datalist>
+    <datalist id="filter-domains-options"></datalist>
+
+    <template id="suggestion-chip-template">
+      <button class="chip" type="button" data-value="">
+        <span></span>
+        <strong></strong>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 5l14 14M19 5L5 19" stroke-width="2" stroke-linecap="round"></path>
+        </svg>
+      </button>
+    </template>
+
+    <script>
+      window.HONEST_ADS_CONFIG = window.HONEST_ADS_CONFIG || {
+        baseUrl: window.location.origin,
+      };
+    </script>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
