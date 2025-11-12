@@ -43,6 +43,23 @@ a {
   gap: 1rem;
 }
 
+.hero__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.hero__logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  object-fit: cover;
+  box-shadow: 0 15px 35px rgba(2, 6, 23, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
 .hero__eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.2em;

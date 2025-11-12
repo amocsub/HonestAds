@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>HonestAds Explorer</title>
+    <title>HonestAds</title>
     <meta
       name="description"
       content="Fast, interactive explorer for Google Ads Transparency Center creatives."
@@ -13,6 +13,7 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
     >
+    <link rel="icon" href="/honestads-logo.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/styles.css">
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-5C9M0KTLYQ"></script>
@@ -28,10 +29,13 @@
   </head>
   <body>
     <header class="hero">
-      <div>
-        <p class="hero__eyebrow">Unofficial transparency explorer</p>
-        <h1>HonestAds</h1>
-      </div>
+      <a class="hero__brand" href="/" aria-label="Go to HonestAds home">
+        <img src="/honestads-logo.svg" alt="HonestAds logo" class="hero__logo">
+        <div>
+          <p class="hero__eyebrow">Unofficial transparency explorer</p>
+          <h1>HonestAds</h1>
+        </div>
+      </a>
       <div class="hero__actions">
         <button id="toggle-description" class="button button--ghost button--small">About</button>
         <div class="hero__status" id="status-pill" hidden></div>
