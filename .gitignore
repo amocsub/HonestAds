@@ -3,6 +3,7 @@ node_modules/
 workers/**/node_modules/
 
 # Build and deployment artifacts
+.wrangler/
 wrangler-state.json
 wrangler-local-state.json
 dist/
