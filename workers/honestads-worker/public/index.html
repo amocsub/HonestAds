@@ -29,11 +29,17 @@
 
     <section class="panel panel--description" id="description-panel" hidden>
       <p>
-        HonestAds proxies Google’s Ads Transparency Center through a Cloudflare Worker, so you can
-        discover advertisers, domains, and creatives without logging in or fighting the official UI.
-        Type anything—brands, NGOs, slogans, domains—and as soon as you track a suggestion the worker
-        streams every matching creative into a responsive gallery. Filters, exports, and dialogs all
-        update in real time so you can investigate ad campaigns as if you were browsing a photo app.
+        HonestAds is a web service that lets you search through advertisers easily and share queries with others. Create
+        filters, copy the URL, and monitor who might be publishing Google Ads on your domain with more control than the
+        official Transparency Center.
+      </p>
+      <p>
+        Made with love by
+        <a href="https://amocsub.gitbook.io/" target="_blank" rel="noopener noreferrer">Mati Busco</a>. Contributions
+        are welcome at
+        <a href="https://github.com/amocsub/HonestAds" target="_blank" rel="noopener noreferrer">github.com/amocsub/HonestAds</a>.
+        If you’d like to support the project you can
+        <a href="https://buymeacoffee.com/amocsub" target="_blank" rel="noopener noreferrer">buy me a beer</a>.
       </p>
     </section>
 
@@ -53,30 +59,31 @@
               autocomplete="off"
             >
           </label>
-          <p class="helper-text">
-            Suggestions refresh as you type. Press <kbd>Enter</kbd> to track the top suggestion.
-          </p>
+          <p class="helper-text">Suggestions refresh as you type. Click “Track” on any row to follow it.</p>
           <div id="suggestions-container" class="suggestions suggestions--compact">
             <p class="empty">Start typing to see suggestions.</p>
           </div>
         </div>
       </section>
 
-      <section class="panel panel--selections">
+      <section class="panel panel--selections" data-collapsed="true">
         <div class="panel__header">
           <div>
             <h2>Tracked suggestions</h2>
-            <p class="helper-text">
-              Click a suggestion to follow it. Creatives download automatically.
-            </p>
+            <p class="helper-text">Tracked entries appear below. Click a chip to edit or remove it.</p>
           </div>
-          <button id="clear-suggestions" class="button button--ghost button--small">Clear all</button>
+          <div class="panel__actions">
+            <button id="collapse-selections" class="button button--ghost button--small">Show tracked</button>
+            <button id="clear-suggestions" class="button button--ghost button--small">Clear all</button>
+          </div>
         </div>
-        <div id="selected-suggestions" class="chip-list" aria-live="polite"></div>
-        <p id="creative-progress" class="helper-text"></p>
+        <div class="panel__content">
+          <div id="selected-suggestions" class="chip-list" aria-live="polite"></div>
+          <p id="creative-progress" class="helper-text"></p>
+        </div>
       </section>
 
-      <section class="panel panel--filters">
+      <section class="panel panel--filters" data-collapsed="false">
         <div class="panel__header">
           <div>
             <h2>Filters & ordering</h2>
@@ -84,26 +91,35 @@
               Build any combination of include/exclude rules, structural thresholds, and sort orders.
             </p>
           </div>
-          <button id="add-filter" class="button button--ghost button--small">+ Add filter</button>
-        </div>
-        <div class="filter-toolbar">
-          <div class="order-by">
-            <label>
-              <span>Order by</span>
-              <select id="order-by">
-                <option value="last_shown_timestamp">Last shown</option>
-                <option value="advertiser_name">Advertiser</option>
-                <option value="domain">Domain</option>
-                <option value="ad_count"># of ads (per advertiser)</option>
-              </select>
-            </label>
-            <button id="order-by-direction" class="button button--ghost button--small" aria-label="Toggle sort direction">
-              Desc
-            </button>
+          <div class="panel__actions">
+            <button id="collapse-filters" class="button button--ghost button--small">Hide filters</button>
+            <button id="add-filter" class="button button--ghost button--small">+ Add filter</button>
           </div>
         </div>
-        <div id="active-filters" class="chip-list chip-list--wrap">
-          <p class="helper-text">No custom filters yet.</p>
+        <div class="panel__content">
+          <div class="filter-toolbar">
+            <div class="order-by">
+              <label>
+                <span>Order by</span>
+                <select id="order-by">
+                  <option value="last_shown_timestamp">Last shown</option>
+                  <option value="advertiser_name">Advertiser</option>
+                  <option value="domain">Domain</option>
+                  <option value="ad_count"># of ads (per advertiser)</option>
+                </select>
+              </label>
+              <button
+                id="order-by-direction"
+                class="button button--ghost button--small"
+                aria-label="Toggle sort direction"
+              >
+                Desc
+              </button>
+            </div>
+          </div>
+          <div id="active-filters" class="chip-list chip-list--wrap">
+            <p class="helper-text">No custom filters yet.</p>
+          </div>
         </div>
       </section>
 
@@ -141,21 +157,29 @@
         <label class="field">
           <span>Filter type</span>
           <select id="filter-type">
-            <option value="includeAdvertiser">Include advertiser</option>
-            <option value="excludeAdvertiser">Exclude advertiser</option>
-            <option value="includeDomain">Include domain</option>
-            <option value="excludeDomain">Exclude domain</option>
-            <option value="minAds">Minimum ads per advertiser</option>
-            <option value="minDomainAdvertisers">Minimum advertisers per domain</option>
+            <option value="advertiser">Advertiser</option>
+            <option value="domain">Domain</option>
+            <option value="adCount"># of ads (per advertiser)</option>
+            <option value="lastShown">Last shown</option>
           </select>
         </label>
-        <label class="field" id="filter-value-wrapper">
-          <span id="filter-value-label">Value</span>
-          <input type="text" id="filter-value" autocomplete="off">
+        <label class="field" id="filter-operator-wrapper">
+          <span>Operator</span>
+          <select id="filter-operator"></select>
         </label>
+        <div class="field" id="filter-value-wrapper">
+          <span id="filter-value-label">Value</span>
+          <select id="filter-multi-value" multiple size="6"></select>
+          <input type="text" id="filter-text-value" autocomplete="off" hidden>
+          <input type="number" id="filter-number-value" autocomplete="off" hidden>
+          <div class="date-range" id="filter-date-range" hidden>
+            <input type="date" id="filter-date-start">
+            <input type="date" id="filter-date-end">
+          </div>
+        </div>
         <menu>
           <button value="cancel" class="button button--ghost">Cancel</button>
-          <button value="submit" class="button button--primary">Add</button>
+          <button value="submit" class="button button--primary" id="filter-submit-button">Add</button>
         </menu>
       </form>
     </dialog>
@@ -186,9 +210,6 @@
         </menu>
       </form>
     </dialog>
-
-    <datalist id="filter-advertisers-options"></datalist>
-    <datalist id="filter-domains-options"></datalist>
 
     <template id="suggestion-chip-template">
       <button class="chip" type="button" data-value="">

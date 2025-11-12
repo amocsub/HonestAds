@@ -123,12 +123,19 @@ main {
   gap: 0.75rem;
 }
 
-.panel--search[data-collapsed='true'] .panel__content {
+.panel[data-collapsed='true'] .panel__content {
   display: none;
 }
 
-.panel--search[data-collapsed='true'] .panel__header {
+.panel[data-collapsed='true'] .panel__header {
   margin-bottom: 0;
+}
+
+.panel__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .helper-text {
@@ -156,6 +163,20 @@ main {
   padding: 0.75rem 1rem;
   color: var(--text);
   font-size: 1rem;
+}
+
+.field select[multiple] {
+  min-height: 8rem;
+}
+
+.date-range {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
+}
+
+.date-range input {
+  width: 100%;
 }
 
 .button {
@@ -196,6 +217,12 @@ main {
 
 .panel--selections .chip-list {
   min-height: 40px;
+}
+
+.panel--selections #selected-suggestions {
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
 }
 
 .suggestions {
