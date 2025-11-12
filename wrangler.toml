@@ -1,0 +1,7 @@
+name = "honestads-worker"
+main = "workers/honestads-worker/src/worker.js"
+compatibility_date = "2024-06-01"
+
+[assets]
+directory = "workers/honestads-worker/public"
+binding = "ASSETS"

@@ -6,7 +6,7 @@
       "type": "node-terminal",
       "request": "launch",
       "command": "npx wrangler dev --config wrangler.toml",
-      "cwd": "${workspaceFolder}/workers/honestads-worker"
+      "cwd": "${workspaceFolder}"
     }
   ]
 }
